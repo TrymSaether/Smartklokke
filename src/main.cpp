@@ -4,15 +4,14 @@
 #include "ICM_20948.h"
 
 // - Constants -
-const char *UBIDOTS_TOKEN = "";  // Put here your Ubidots TOKEN
-const char *WIFI_SSID = "";      // Put here your Wi-Fi SSID
-const char *WIFI_PASS = "";      // Put here your Wi-Fi password
-const char *DEVICE_LABEL = "";   // Put here your Device label to which data  will be published
-const char *VARIABLE_LABEL = ""; // Put here your Variable label to which data  will be published
+const char *UBIDOTS_TOKEN = "BBFF-eHgsVCIJbnSJQxJZ7wHKPZ3VQOuf6P";  // Put here your Ubidots TOKEN
+const char *WIFI_SSID = "Trym sin iPhone";      // Put here your Wi-Fi SSID
+const char *WIFI_PASS = "eplepai1";      // Put here your Wi-Fi password
+const char *DEVICE_LABEL = "smartklokke";   // Put here your Device label to which data  will be published
+const char *VARIABLE_LABEL = "knapp"; // Put here your Variable label to which data  will be published
 const int PUBLISH_FREQUENCY = 5000; // Update rate in milliseconds
-
+const int button = 32;
 unsigned long timer;
-uint8_t analogPin = 34; // Pin used to read data from GPIO34 ADC_CH6.
 
 Ubidots ubidots(UBIDOTS_TOKEN);
 
@@ -46,12 +45,14 @@ void setup()
   ubidots.setup();
   ubidots.reconnect();
 
+  pinMode(button,INPUT);
   timer = millis();
+  
 }
 
 void loop()
 {
-
+  int val1 = digitalRead(button);
   // put your main code here, to run repeatedly:
   if (!ubidots.connected())
   {
@@ -59,8 +60,8 @@ void loop()
   }
   if (abs(millis() - timer) > PUBLISH_FREQUENCY) // triggers the routine every 5 seconds
   {
-    float value = analogRead(analogPin);
-    ubidots.add(VARIABLE_LABEL, value); // Insert your variable Labels and the value to be sent
+    Serial.println(val1);
+    ubidots.add(VARIABLE_LABEL, val1); // Insert your variable Labels and the value to be sent
     ubidots.publish(DEVICE_LABEL);
     timer = millis();
   }
