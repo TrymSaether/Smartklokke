@@ -32,6 +32,10 @@ Ubidots ubidots(UBIDOTS_TOKEN);
 
 void callback(char *topic, byte *payload, unsigned int length)
 {
+  buffT = 0;
+  buffA = 0;
+  buffH = 0;
+  buffP = 0;
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.println("] ");
@@ -39,16 +43,16 @@ void callback(char *topic, byte *payload, unsigned int length)
   {
     Serial.println((char)payload[i]);
     if (topic = "temperatur"){
-      *buffT = payload[i];
+      *buffT += payload[i];
     }
     if (topic = "humidity"){
-      *buffH = payload[i];
+      *buffH += payload[i];
     }
     if (topic = "altitude"){
-      *buffA = payload[i];
+      *buffA += payload[i];
     }
     if (topic = "pressure"){
-      *buffP = payload[i];
+      *buffP += payload[i];
     }
   }
   Serial.println();
