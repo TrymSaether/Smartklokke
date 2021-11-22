@@ -7,7 +7,10 @@
 SSD1306Wire  display(0x3c, 18, 19);  //18=SDK  19=SCK  As per labeling on ESP32 DevKit
 #define SEALEVELPRESSURE_HPA (1013.25)
 
-int buff[3];
+char buffT[6];
+char buffA[6];
+char buffH[6];
+char buffP[6];
 Adafruit_BME280 bme;
 
 const char *UBIDOTS_TOKEN = "BBFF-OGwA21Z6uhoggc3wiUHnvhLUPbnRsh";  // Put here your Ubidots TOKEN
@@ -36,16 +39,16 @@ void callback(char *topic, byte *payload, unsigned int length)
   {
     Serial.println((char)payload[i]);
     if (topic = "temperatur"){
-      buff[0] = payload[i] - '0';
+      *buffT = payload[i];
     }
     if (topic = "humidity"){
-      buff[1] = payload[i] - '0';
+      *buffH = payload[i];
     }
     if (topic = "altitude"){
-      buff[2] = payload[i] - '0';
+      *buffA = payload[i];
     }
     if (topic = "pressure"){
-      buff[3] = payload[i] - '0';
+      *buffP = payload[i];
     }
   }
   Serial.println();
@@ -108,26 +111,26 @@ void screen() {
       
     display.setFont(ArialMT_Plain_10);
     display.drawString(0, 20, "Temperature");
-    display.drawString(75, 20, String(buff[0]));
+    display.drawString(75, 20, String(buffT));
 
     display.setFont(ArialMT_Plain_10);
     display.drawString(100, 20, "*C");
 
     display.drawString(0, 30, "Humidity");
     display.setFont(ArialMT_Plain_10);
-    display.drawString(75, 30, String(buff[1]));
+    display.drawString(75, 30, String(buffH));
     display.setFont(ArialMT_Plain_10);
     display.drawString(100, 30, "%");
 
     display.drawString(0, 40, "Altitude");
     display.setFont(ArialMT_Plain_10);
-    display.drawString(75, 40, String(buff[2]));
+    display.drawString(75, 40, String(buffA));
     display.setFont(ArialMT_Plain_10);
     display.drawString(100, 40, "m");
 
     display.drawString(0, 50, "Pressure");
     display.setFont(ArialMT_Plain_10);
-    display.drawString(75, 50, String(buff[3]));
+    display.drawString(75, 50, String(buffP));
     display.setFont(ArialMT_Plain_10);
     display.drawString(100, 50, "hPa");
   display.display();
