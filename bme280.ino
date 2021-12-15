@@ -3,16 +3,20 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include "UbidotsEsp32Mqtt.h"
-
+#include "time.h"
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#define BUTTON_PIN 15
 const int Read_Speed = 5000;
 const int Publish_Frquency = 5000;
 const int Subscribe_Speed = 5000;
 const int Sealevl_Pressure = 1013.25;
+const int Button_Read_Speed = 1000;
 unsigned long Timer_Screen;
 unsigned long Timer_Publish;
 unsigned long Timer_Subscribe;
+unsigned long Button_Last;
+int count = 0;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Adafruit_BME280 bme;
@@ -26,6 +30,9 @@ const char *VARIABLE_Temperature = "temperatur"; // Replace with your variable l
 const char *VARIABLE_Humidity = "humidity"; // Replace with your variable label to subscribe to
 const char *VARIABLE_Altitude = "altitude"; // Replace with your variable label to subscribe to
 const char *VARIABLE_Pressure = "pressure"; // Replace with your variable label to subscribe to
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 0;
+const int   daylightOffset_sec = 3600;
 Ubidots ubidots(UBIDOTS_TOKEN);
 char *Topic_Temperature = "/v2.0/devices/esp32/temperatur/lv";
 char *Topic_Humidity = "/v2.0/devices/esp32/humidity/lv";
@@ -36,6 +43,9 @@ String(Sensor_Humidity);
 String(Sensor_Altitude);
 String(Sensor_Pressure);
 
+int lastState = LOW;  // the previous state from the input pin
+int currentState;     // the current reading from the input pin
+struct tm timeinfo;
         
 void callback(char *topic, byte *payload, unsigned int length){
 
@@ -53,7 +63,7 @@ void callback(char *topic, byte *payload, unsigned int length){
   }
 }
 void publis(){
-    if (abs(millis() - Timer_Publish) > Publish_Frquency){
+    if ((abs(millis() - Timer_Publish) > Publish_Frquency)&&(ubidots.connected())){
         float Temperature = bme.readTemperature();
         float Pressure = (bme.readPressure()/100.0F);
         float Altitude = bme.readAltitude(Sealevl_Pressure);
@@ -75,7 +85,7 @@ void publis(){
     }
 }
 void subscribe(){
-  if (abs(millis() - Timer_Subscribe) > Publish_Frquency){
+  if ((abs(millis() - Timer_Subscribe) > Publish_Frquency)&&(ubidots.connected())){
     ubidots.subscribeLastValue(DEVICE_LABEL, VARIABLE_Temperature);
     ubidots.subscribeLastValue(DEVICE_LABEL, VARIABLE_Humidity);
     ubidots.subscribeLastValue(DEVICE_LABEL, VARIABLE_Altitude);
@@ -87,11 +97,12 @@ void screen_online(){
     if (abs(millis() - Timer_Screen) > Read_Speed){
         display.setCursor(0,0);
         display.clearDisplay();
+        display.setTextSize(1);
         display.print("Sensor");
-        display.setCursor(0,20); display.print("Temperature:"); display.print(Sensor_Temperature); display.print(" *C");
-        display.setCursor(0,30); display.print("Humidity:   "); display.print(Sensor_Humidity); display.print(" %");
-        display.setCursor(0,40); display.print("Altitude:   "); display.print(Sensor_Altitude); display.print(" m");
-        display.setCursor(0,50); display.print("Pressure:   "); display.print(Sensor_Pressure); display.print(" hPa");
+        display.setCursor(0,20); display.print("Temperature:"); display.print(Sensor_Temperature); display.print("*C");
+        display.setCursor(0,30); display.print("Humidity:  "); display.print(Sensor_Humidity); display.print("%");
+        display.setCursor(0,40); display.print("Altitude:  "); display.print(Sensor_Altitude); display.print("m");
+        display.setCursor(0,50); display.print("Pressure:  "); display.print(Sensor_Pressure); display.print("hPa");
         display.display();
         Timer_Screen = millis();
     }
@@ -102,22 +113,65 @@ void screen_offline(){
   float Pressure = (bme.readPressure()/100.0F);
   float Altitude = bme.readAltitude(Sealevl_Pressure);
   float Humidity = bme.readHumidity();
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return;
+  }
   if (abs(millis() - Timer_Screen) > Read_Speed){
         display.setCursor(0,0);
         display.clearDisplay();
-        display.print("Sensor");
-        display.setCursor(0,20); display.print("Temperature:"); display.print(Temperature); display.print(" *C");
-        display.setCursor(0,30); display.print("Humidity:   "); display.print(Humidity); display.print(" %");
-        display.setCursor(0,40); display.print("Altitude:   "); display.print(Altitude); display.print(" m");
-        display.setCursor(0,50); display.print("Pressure:   "); display.print(Pressure); display.print(" hPa");
+        display.setTextSize(1);
+        display.print("Sensor  "); display.print("Offline");
+        display.setCursor(0,20); display.print("Temperature:"); display.print(Temperature); display.print("C");
+        display.setCursor(0,30); display.print("Humidity:  "); display.print(Humidity); display.print("%");
+        display.setCursor(0,40); display.print("Altitude:  "); display.print(Altitude); display.print("m");
+        display.setCursor(0,50); display.print("Pressure:  "); display.print(Pressure); display.print("hPa");
         display.display();
         Timer_Screen = millis();
   }
 }
 
 void Clock(){
-  
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return;
+  }
+  display.clearDisplay();
+  if (!ubidots.connected()){
+    display.setTextSize(1);
+    display.setCursor(0,0); display.print("        Offline");
+  }
+  display.setTextSize(2);
+  display.setCursor(0,20); display.print(&timeinfo, " %H:%M:%S");
+  display.display();
+  delay(5);
 }
+void Button(){
+  currentState = digitalRead(BUTTON_PIN);
+  if (((millis() - Button_Last) > Button_Read_Speed) && (currentState == LOW)){
+    if(count == 0){
+      count++;      
+    }
+    else if(count == 1){
+      count = 0;
+    }
+    Button_Last = millis();
+  }
+  if (count == 0){
+    if (!ubidots.connected()){
+      screen_offline();
+      Serial.println(1);
+    }
+    else{
+      screen_online();
+      Serial.println(2);
+    }
+  }
+  if (count == 1){
+    Clock();
+  }
+}
+
 void setup() {
   Serial.begin(115200);
 
@@ -129,7 +183,7 @@ void setup() {
   bool status = bme.begin(0x76);  
   if (!status) {
     Serial.println("Could not find a valid BME280 sensor, check wiring!");
-    while (1);
+    while(1);
   }
  
   delay(2000);
@@ -141,20 +195,33 @@ void setup() {
   Timer_Screen = millis();
   Timer_Publish = millis();
   Timer_Subscribe = millis();
+  Button_Last = millis();
   display.setTextSize(1);
   display.setTextColor(WHITE);
 
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  printLocalTime();
+  Clock();
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
 }
 
 void loop() {
-    if (!ubidots.connected()){
-      screen_offline();
-      ubidots.reconnect();
-    }
-    screen_online();
-    publis();
-    subscribe();
-    ubidots.loop();
+  if (!ubidots.connected()){
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    for (int i = 0; i < 1; i++) {
+      Serial.printf("WIFI Status: %d\n", WiFi.status());
+      Serial.print(".");
+      WiFi.begin(WIFI_SSID, WIFI_PASS);
+      delay(1000);
+      if(WiFi.status() != WL_CONNECTED){
+        Serial.println(".");
+      }
+      if(WiFi.status() == WL_CONNECTED){
+        ubidots.reconnect();
+      }  
+    }      
+  }
+  Button();
+  publis();
+  subscribe();
+  ubidots.loop();
 }
