@@ -288,7 +288,7 @@ void screen_stepcounter(){
     display.setTextSize(2);
     display.setCursor(0, 20);
     display.print("Skritt:");
-    display.print(String(stepSum));
+    display.print(stepSum);
     display.display();
 }
 
@@ -407,9 +407,6 @@ void setup()
     Timer_Publish = millis();
     Timer_Subscribe = millis();
     Button_Last = millis();
-    display.setTextSize(1);
-    display.setTextColor(WHITE);
-
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
     Clock();
     pinMode(BUTTON_PIN, INPUT_PULLUP);
