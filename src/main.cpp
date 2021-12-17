@@ -8,46 +8,47 @@
 #include "time.h"
 #include <Adafruit_SSD1306.h>
 
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
-#define BUTTON_PIN 15
-const int Read_Speed = 5000;
-const int Publish_Frquency = 5000;
-const int Subscribe_Speed = 5000;
-const int Sealevl_Pressure = 1013.25;
-const int Button_Read_Speed = 1000;
-unsigned long Timer_Screen;
-unsigned long Timer_Publish;
-unsigned long Timer_Subscribe;
-unsigned long Button_Last;
-int count = 0;
-void screen_stepcounter();
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-Adafruit_BME280 bme;
+#define SCREEN_WIDTH 128 // Bredde på OLED skjerm i pixels
+#define SCREEN_HEIGHT 64 // Høyde på OLED skjerm i pixels
+#define BUTTON_PIN 15   // Tinkoblingspinne for knapp
+const int Read_Speed = 5000; // Frekvens på avlesning av bme280
+const int Publish_Frquency = 5000;  // frekvens for opplastning til Ubidots
+const int Subscribe_Speed = 5000;   // frekvens for avlesning av Ubidots
+const int Sealevl_Pressure = 1013.25;   // kalibrering av trykk
+const int Button_Read_Speed = 1000;     // Sperre for å unngå flere avlesninger av et knappetrykk
+unsigned long Timer_Screen;     // oppdateringshastighet av skjerm
+unsigned long Timer_Publish;    // tid siden siste publisering
+unsigned long Timer_Subscribe;  // tid siden siste avlesning av Ubidost
+unsigned long Button_Last;      // tid siden knapp ble trykket
+int count = 0;                  // variabel for å bytte mellom skjermsider
 
-const char *UBIDOTS_TOKEN = "BBFF-OGwA21Z6uhoggc3wiUHnvhLUPbnRsh"; // Put here your Ubidots TOKEN
-const char *WIFI_SSID = "Eirik sin iPhone";                        // Put here your Wi-Fi SSID
-const char *WIFI_PASS = "1234567890";                              // Put here your Wi-Fi password
-const char *DEVICE_LABEL = "esp32";                                // Replace with the device label to subscribe to
-const char *VARIABLE_Temperature = "temperatur";                   // Replace with your variable label to subscribe to
-const char *VARIABLE_Humidity = "humidity";                        // Replace with your variable label to subscribe to
-const char *VARIABLE_Altitude = "altitude";                        // Replace with your variable label to subscribe to
-const char *VARIABLE_Pressure = "pressure";                        // Replace with your variable label to subscribe to
-const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 0;
-const int daylightOffset_sec = 3600;
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); // Setter parametere for skjerm
+Adafruit_BME280 bme;    // I2C
+
+const char *UBIDOTS_TOKEN = "BBFF-OGwA21Z6uhoggc3wiUHnvhLUPbnRsh"; // Ubidots TOKEN
+const char *WIFI_SSID = "Eirik sin iPhone";                        // Wi-Fi SSID
+const char *WIFI_PASS = "1234567890";                              // Wi-Fi password
+const char *DEVICE_LABEL = "esp32";                                // Device label på Ubidots vi ønsker å subscribe til
+const char *VARIABLE_Temperature = "temperatur";    // variable label vi ønsker å koble oss til
+const char *VARIABLE_Humidity = "humidity";                     
+const char *VARIABLE_Altitude = "altitude";                       
+const char *VARIABLE_Pressure = "pressure";                        
+const char *VARIABLE_Steps = "steps";                              
+const char *ntpServer = "pool.ntp.org"; // Nettside vi bruker for å hente klokkeslett          
+const long gmtOffset_sec = 0;   // for å stille klokken til en annen tidssone
+const int daylightOffset_sec = 0;    // for å få sommertid settes denne til 3600
 Ubidots ubidots(UBIDOTS_TOKEN);
-char *Topic_Temperature = "/v2.0/devices/esp32/temperatur/lv";
+char *Topic_Temperature = "/v2.0/devices/esp32/temperatur/lv"; // for å lese av hvilke topic som kommer
 char *Topic_Humidity = "/v2.0/devices/esp32/humidity/lv";
 char *Topic_Altitude = "/v2.0/devices/esp32/altitude/lv";
 char *Topic_Pressure = "/v2.0/devices/esp32/pressure/lv";
-String(Sensor_Temperature);
+String(Sensor_Temperature); // lagringsplass for payload
 String(Sensor_Humidity);
 String(Sensor_Altitude);
 String(Sensor_Pressure);
-int lastState = LOW; // the previous state from the input pin
-int currentState;    // the current reading from the input pin
-struct tm timeinfo;
+int lastState = LOW; // på/av knapp før
+int currentState;    // på/av knapp nå
+struct tm timeinfo; // tid og dato brutt opp som komponeter
 
 // - Deklarasjon -
 // ICM-20948
@@ -68,7 +69,7 @@ const float xErr = 0.80; // Sensorkorigeringsverdier.
 const float yErr = 0.50;
 const float zErr = 10.22;
 const float threshold = 0.05; // Grense for stegakselerasjon
-const int maxThreshold = 7.5;
+const int maxThreshold = 20.5;
 float vectorMag;
 
 // Diverse
@@ -96,88 +97,92 @@ void setupICM()
     icm.setAccelRange(ICM20948_ACCEL_RANGE_2_G);
     icm.setAccelRateDivisor(4095);
 }
-void Clock()
+void Clock()    // for å vise klokken på skjermen
 {
-    if (!getLocalTime(&timeinfo))
+    if (!getLocalTime(&timeinfo))   // skjekker om avlesning av klokken ble gjennomført riktig
     {
         Serial.println("Failed to obtain time");
         return;
     }
-    display.clearDisplay();
-    if (!ubidots.connected())
+    display.clearDisplay();  // sletter alt på skjermen
+    if (!ubidots.connected())   // skjekker tilkobling til skjermen
     {
-        display.setTextSize(1);
-        display.setCursor(0, 0);
-        display.print("        Offline");
+        display.setTextSize(1); // tekststørrelse på skjermen
+        display.setCursor(0, 0);    // plasering av første pixel på skjermen
+        display.print("        Offline");   // printer til skjerm
     }
-    display.setTextSize(2);
-    display.setCursor(0, 20);
-    display.print(&timeinfo, " %H:%M:%S");
-    display.display();
-    delay(5);
+    display.setTextSize(2); // tekststørrelse på skjermen
+    display.setCursor(0, 20);    // plasering av første pixel på skjermen
+    display.print(&timeinfo, " %H:%M:%S");  // printer klokkeslett til skjerm
+    display.display();  // for å vise alt som har blitt printet til skjermen
 }
-void callback(char *topic, byte *payload, unsigned int length)
+void callback(char *topic, byte *payload, unsigned int length)  // for å mota data fra Ubidots
 {
 
-    if (strcmp(topic, Topic_Temperature) == 0)
-    {
-        Sensor_Temperature = (char *)payload;
+    if (strcmp(topic, Topic_Temperature) == 0) // skjekker topic
+    {   
+        Sensor_Temperature = String((char *)payload);   // lagrer payloaden
     }
     if (strcmp(topic, Topic_Humidity) == 0)
     {
-        Sensor_Humidity = (char *)payload;
+        Sensor_Humidity = String((char *)payload);
     }
     if (strcmp(topic, Topic_Altitude) == 0)
     {
-        Sensor_Altitude = (char *)payload;
+        Sensor_Altitude = String((char *)payload);
     }
     if (strcmp(topic, Topic_Pressure) == 0)
     {
-        Sensor_Pressure = (char *)payload;
+        Sensor_Pressure = String((char *)payload);
     }
 }
-void publis()
+void publis()   // for publisering
 {
-    if ((abs(millis() - Timer_Publish) > Publish_Frquency) && (ubidots.connected()))
+    if ((abs(millis() - Timer_Publish) > Publish_Frquency) && (ubidots.connected())) // Skjekker tilkobling til ubidots og hvor lenge siden siste opplastning
     {
-        float Temperature = bme.readTemperature();
+        float Temperature = bme.readTemperature();          // leser av bme280 sensor
         float Pressure = (bme.readPressure() / 100.0F);
         float Altitude = bme.readAltitude(Sealevl_Pressure);
         float Humidity = bme.readHumidity();
-        if (!isnan(Temperature))
+        if (!isnan(Temperature))    // skjekker at avlesning ikke er en NaN
         {
-            ubidots.add(VARIABLE_Temperature, Temperature); // Insert your variable Labels and the value to be sent
+            ubidots.add(VARIABLE_Temperature, Temperature); // klargjør data til publisering til ubidots
         }
         if (!isnan(Humidity))
         {
-            ubidots.add(VARIABLE_Humidity, Humidity); // Insert your variable Labels and the value to be sent
+            ubidots.add(VARIABLE_Humidity, Humidity); 
         }
         if (!isnan(Temperature))
         {
-            ubidots.add(VARIABLE_Altitude, Altitude); // Insert your variable Labels and the value to be sent
+            ubidots.add(VARIABLE_Altitude, Altitude); 
         }
         if (!isnan(Humidity))
         {
-            ubidots.add(VARIABLE_Pressure, Pressure); // Insert your variable Labels and the value to be sent
+            ubidots.add(VARIABLE_Pressure, Pressure); 
         }
-        ubidots.publish(DEVICE_LABEL);
-        Timer_Publish = millis();
+        if (!isnan(stepSum))
+        {
+            ubidots.add(VARIABLE_Steps, stepSum); 
+        }
+        ubidots.publish(DEVICE_LABEL);  // publiserer til det som er klargjort for opplasting
+        Timer_Publish = millis();       // setter tid for forrige opplasting
     }
 }
-void subscribe()
+void subscribe() // for å hente data fra ubidots
 {
-    if ((abs(millis() - Timer_Subscribe) > Publish_Frquency) && (ubidots.connected()))
+    if ((abs(millis() - Timer_Subscribe) > Publish_Frquency) && (ubidots.connected())) // Skjekker tilkobling til ubidots og hvor lenge siden siste opplastning
     {
-        ubidots.subscribeLastValue(DEVICE_LABEL, VARIABLE_Temperature);
+        ubidots.subscribeLastValue(DEVICE_LABEL, VARIABLE_Temperature); // sender forespørsel om data til ubidots
         ubidots.subscribeLastValue(DEVICE_LABEL, VARIABLE_Humidity);
         ubidots.subscribeLastValue(DEVICE_LABEL, VARIABLE_Altitude);
         ubidots.subscribeLastValue(DEVICE_LABEL, VARIABLE_Pressure);
+        Timer_Subscribe = millis(); // setter tid for forrige forspørsel
     }
 }
 
-void screen_online()
+void screen_online() // Forå vise data fra bme280 på skjerm når online 
 {
-    if (abs(millis() - Timer_Screen) > Read_Speed)
+    if (abs(millis() - Timer_Screen) > Read_Speed) // oppdaterings hastighet av skjerm 
     {
         display.setCursor(0, 0);
         display.clearDisplay();
@@ -185,7 +190,7 @@ void screen_online()
         display.print("Sensor");
         display.setCursor(0, 20);
         display.print("Temperature:");
-        display.print(Sensor_Temperature);
+        display.print(Sensor_Temperature); // data fra ubidots
         display.print("*C");
         display.setCursor(0, 30);
         display.print("Humidity:  ");
@@ -206,17 +211,13 @@ void screen_online()
 
 
 
-void screen_offline()
+void screen_offline() // Forå vise data fra bme280 på skjerm når offline
 {
     float Temperature = bme.readTemperature();
     float Pressure = (bme.readPressure() / 100.0F);
     float Altitude = bme.readAltitude(Sealevl_Pressure);
     float Humidity = bme.readHumidity();
-    if (!getLocalTime(&timeinfo))
-    {
-        Serial.println("Failed to obtain time");
-        return;
-    }
+
     if (abs(millis() - Timer_Screen) > Read_Speed)
     {
         display.setCursor(0, 0);
@@ -245,25 +246,34 @@ void screen_offline()
     }
 }
 
-void Button()
-{
-    currentState = digitalRead(BUTTON_PIN);
+void screen_stepcounter(){ // for å vise altall skritt på skjerm
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setCursor(0, 20);
+    display.print("Skritt:");
+    display.print(stepSum);
+    display.display();
+}
+
+void Button()   // avlesning av knapp og for å bytte mellom hva som vises på skjerm
+{   
+    currentState = digitalRead(BUTTON_PIN); // avlesning av knapp
     if (((millis() - Button_Last) > Button_Read_Speed) && (currentState == LOW))
     {
-        if (count == 0)
+        if (count == 0) // for å bytte mellom hva som vises på skjerm
         {
             count++;
         }
-        if (count == 1)
+        else if (count == 1)
         {
             count++;
         }
-        if (count = 2){
+        else if (count = 2){
             count = 0;
         }
         Button_Last = millis();
     }
-    if (count == 0)
+    if (count == 0) // for å vis forskjellig informasjon på skjerm
     {
         if (!ubidots.connected())
         {
@@ -274,22 +284,13 @@ void Button()
             screen_online();
         }
     }
-    if (count == 1)
+    else if (count == 1)
     {
         Clock();
     }
-    if (count == 2){
+    else if (count == 2){
         screen_stepcounter();
     }
-}
-
-void screen_stepcounter(){
-    display.clearDisplay();
-    display.setTextSize(2);
-    display.setCursor(0, 20);
-    display.print("Skritt:");
-    display.print(stepSum);
-    display.display();
 }
 
 void stepInit() // Skritteller
@@ -354,7 +355,7 @@ void printData()
     deltaStepSum = stepSum;
 }
 
-void setupBME()
+void setupBME() // oppkobling av bme280 og skjerm
 {
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
     {
@@ -370,22 +371,22 @@ void setupBME()
             ;
     }
 }
-void connectUbidots()
+void connectUbidots() // for å koble til ubidots hvis den hgar mistet tilkobling til internett
 {
-    if (!ubidots.connected())
+    if (!ubidots.connected()) // skjekker tilkobling
     {
-        WiFi.begin(WIFI_SSID, WIFI_PASS);
+        WiFi.begin(WIFI_SSID, WIFI_PASS); // prøver å koble til internett
         for (int i = 0; i < 1; i++)
         {
             Serial.printf("WIFI Status: %d\n", WiFi.status());
             Serial.print(".");
             WiFi.begin(WIFI_SSID, WIFI_PASS);
             delay(1000);
-            if (WiFi.status() != WL_CONNECTED)
+            if (WiFi.status() != WL_CONNECTED) // ikke tilkoblet
             {
                 Serial.println(".");
             }
-            if (WiFi.status() == WL_CONNECTED)
+            if (WiFi.status() == WL_CONNECTED) // tilkoblet
             {
                 ubidots.reconnect();
             }
@@ -395,31 +396,33 @@ void connectUbidots()
 
 void setup()
 {
-    Serial.begin(115200);
-    setupICM();
-    setupBME();
-    display.clearDisplay();
-    ubidots.connectToWifi(WIFI_SSID, WIFI_PASS);
-    ubidots.setCallback(callback);
+    Serial.begin(115200); // 115200 bps
+    setupICM(); // oppkobling av ICM20948
+    setupBME(); // oppkobling av BME280 og skjerm
+    ubidots.connectToWifi(WIFI_SSID, WIFI_PASS); // kobler til internett
+    ubidots.setCallback(callback);  // starter callback 
     ubidots.setup();
-    ubidots.reconnect();
-    Timer_Screen = millis();
+    ubidots.reconnect(); // kobler til ubidots
+    Timer_Screen = millis();    // starter timer 
     Timer_Publish = millis();
     Timer_Subscribe = millis();
     Button_Last = millis();
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-    Clock();
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    display.clearDisplay(); // Fjerner innhold på skjerm 
+    display.setTextSize(1); // for å starte skjermen
+    display.setTextColor(WHITE); // for å starte skjermen
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // henter klokkeslett og dato
+    Clock();    // starter klokke på esp32
+    pinMode(BUTTON_PIN, INPUT_PULLUP);  // pin knapp
 }
 
 void loop()
-{
+{   
+    stepInit();
     connectUbidots();
     icm.getEvent(&acc, &gyro, &temp, &mag);
     Button();
     publis();
     subscribe();
     ubidots.loop();
-    stepInit();
-    // printData();
+    printData();
 }
