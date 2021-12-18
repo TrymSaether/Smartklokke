@@ -35,8 +35,8 @@ const char *VARIABLE_Altitude = "altitude";
 const char *VARIABLE_Pressure = "pressure";                        
 const char *VARIABLE_Steps = "steps";                              
 const char *ntpServer = "pool.ntp.org"; // Nettside vi bruker for å hente klokkeslett          
-const long gmtOffset_sec = 0;   // for å stille klokken til en annen tidssone
-const int daylightOffset_sec = 0;    // for å få sommertid settes denne til 3600
+const long gmtOffset_sec = 3600;   // for å stille klokken til en annen tidssone
+const int summer_winter_time = 3600;    // for å få sommertid settes denne til 3600
 Ubidots ubidots(UBIDOTS_TOKEN);
 char *Topic_Temperature = "/v2.0/devices/esp32/temperatur/lv"; // for å lese av hvilke topic som kommer
 char *Topic_Humidity = "/v2.0/devices/esp32/humidity/lv";
@@ -408,7 +408,7 @@ void setup()
     display.clearDisplay(); // Fjerner innhold på skjerm 
     display.setTextSize(1); // for å starte skjermen
     display.setTextColor(WHITE); // for å starte skjermen
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // henter klokkeslett og dato
+    configTime(gmtOffset_sec, summer_winter_time, ntpServer); // henter klokkeslett og dato
     Clock();    // starter klokke på esp32
     pinMode(BUTTON_PIN, INPUT_PULLUP);  // pin knapp
 }
