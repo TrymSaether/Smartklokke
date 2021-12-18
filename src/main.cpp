@@ -105,15 +105,14 @@ void Clock()    // for å vise klokken på skjermen
         return;
     }
     display.clearDisplay();  // sletter alt på skjermen
-    if (!ubidots.connected())   // skjekker tilkobling til skjermen
-    {
-        display.setTextSize(1); // tekststørrelse på skjermen
-        display.setCursor(0, 0);    // plasering av første pixel på skjermen
-        display.print("        Offline");   // printer til skjerm
-    }
     display.setTextSize(2); // tekststørrelse på skjermen
-    display.setCursor(0, 20);    // plasering av første pixel på skjermen
-    display.print(&timeinfo, " %H:%M:%S");  // printer klokkeslett til skjerm
+    display.setCursor(18,0);    // plasering av første pixel på skjermen
+    display.print(&timeinfo, "%A");  // printer dag til skjerm
+    display.setCursor(18, 20);    // plasering av første pixel på skjermen
+    display.print(&timeinfo, "%H:%M:%S");  // printer klokkeslett til skjerm
+    display.setTextSize(1); // tekststørrelse på skjermen
+    display.setCursor(18, 40);
+    display.print(&timeinfo, "%B %d %Y");  // printer dato til skjerm
     display.display();  // for å vise alt som har blitt printet til skjermen
 }
 void callback(char *topic, byte *payload, unsigned int length)  // for å mota data fra Ubidots
