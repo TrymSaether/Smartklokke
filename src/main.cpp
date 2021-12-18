@@ -68,7 +68,7 @@ static float currentVectorMag = 0;
 const float xErr = 0.80; // Sensorkorigeringsverdier.
 const float yErr = 0.50;
 const float zErr = 10.22;
-const float threshold = 0.05; // Grense for stegakselerasjon
+const float threshold = 0.1; // Grense for stegakselerasjon
 const int maxThreshold = 20.5;
 float vectorMag;
 
@@ -213,13 +213,12 @@ void screen_online() // Forå vise data fra bme280 på skjerm når online
 
 void screen_offline() // Forå vise data fra bme280 på skjerm når offline
 {
-    float Temperature = bme.readTemperature();
-    float Pressure = (bme.readPressure() / 100.0F);
-    float Altitude = bme.readAltitude(Sealevl_Pressure);
-    float Humidity = bme.readHumidity();
-
     if (abs(millis() - Timer_Screen) > Read_Speed)
     {
+        float Temperature = bme.readTemperature();
+        float Pressure = (bme.readPressure() / 100.0F);
+        float Altitude = bme.readAltitude(Sealevl_Pressure);
+        float Humidity = bme.readHumidity();
         display.setCursor(0, 0);
         display.clearDisplay();
         display.setTextSize(1);
