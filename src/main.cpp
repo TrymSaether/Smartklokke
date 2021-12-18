@@ -121,19 +121,19 @@ void callback(char *topic, byte *payload, unsigned int length)  // for å mota d
 
     if (strcmp(topic, Topic_Temperature) == 0) // skjekker topic
     {   
-        Sensor_Temperature = String((char *)payload);   // lagrer payloaden
+        Sensor_Temperature = (char *)payload;   // lagrer payloaden
     }
     if (strcmp(topic, Topic_Humidity) == 0)
     {
-        Sensor_Humidity = String((char *)payload);
+        Sensor_Humidity = (char *)payload;
     }
     if (strcmp(topic, Topic_Altitude) == 0)
     {
-        Sensor_Altitude = String((char *)payload);
+        Sensor_Altitude = (char *)payload;
     }
     if (strcmp(topic, Topic_Pressure) == 0)
     {
-        Sensor_Pressure = String((char *)payload);
+        Sensor_Pressure = (char *)payload;
     }
 }
 void publis()   // for publisering
